@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - prod
+  push:
+    branches:
+      - dev
+
+jobs:
+  ci-build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: install pnpm
+        run: npm i -g pnpm
+
+      - name: Caching dependencies
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: "**/node_modules"
+          key: ${{runner.os}}-node-${{hashFiles('**/pnpm-lock.json')}}
+          restore-keys: |
+            ${{ runner.os }}-node-
+            ${{ runner.os }}
+              
+      - name: Install package
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: pnpm i
+
+      - name: env set
+        working-directory: ./
+        run: |
+          touch .env
+          echo POSTGRESQL_DB_URL=${{secrets.POSTGRESQL_DB_URL}} >> .env
+          echo JWT_PRIVATE=${{secrets.JWT_PRIVATE}} >> .env
+          echo JWT_SECRET=${{secrets.JWT_SECRET}} >> .env
+          echo PORT=${{secrets.PORT}} >> .env
+          echo SALT=${{secrets.SALT}} >> .env
+          echo ORIGIN=${{secrets.ORIGIN}} >> .env
+          echo GOOGLE_CLIENT_ID=${{secrets.GOOGLE_CLIENT_ID}} >> .env
+          echo GOOGLE_SECURE_PASSWORD=${{secrets.GOOGLE_SECURE_PASSWORD}} >> .env
+          echo GOOGLE_CALLBACK_URL=${{secrets.GOOGLE_CALLBACK_URL}} >> .env
+
+      - name: prisma set
+        run: npx prisma generate
+
+      - name: Test unit
+        run: pnpm test:prod
+
+      # - name: Test E2E
+      #   run: pnpm test:e2e
+
+      - name: test
+        run: |
+          pnpm build
+          timeout ${{ vars.SLEEP }} nohup node dist/main.js > app.log || code=$?; if [[ $code -ne 124 && $code -ne 0 ]]; then exit $code; fi
+          cat app.log
