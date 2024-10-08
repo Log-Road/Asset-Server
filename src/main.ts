@@ -1,52 +1,45 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { Transport } from '@nestjs/microservices';
-import { WinstonModule } from 'nest-winston';
+import { AssetServerModule } from './asset-server.module';
 import { configDotenv } from 'dotenv';
-import { WinstonInstance } from './utils/winston.util';
-import { CorsOptions } from './utils/corsOption.util';
+import { WinstonInstance } from 'utils/winston';
+import { HttpExceptionFilter } from 'utils/http.exception.filter';
+import { WinstonModule } from 'nest-winston';
 import { ValidationPipe, Logger } from '@nestjs/common';
-import { HttpExceptionFilter } from './filter/http.exception.filter';
 
 async function bootstrap() {
-  configDotenv();
-
-  const app = await NestFactory.create(AppModule, {
-    cors: CorsOptions,
-    logger: WinstonModule.createLogger({
-      instance: WinstonInstance,
-    }),
+  configDotenv({
+    path: '../.env',
   });
 
-  await NestFactory.createMicroservice(AppModule, {
-    transport: Transport.GRPC,
-    logger: WinstonModule.createLogger({
-      instance: WinstonInstance,
-    }),
-    options: {
-      package: 'road',
-      url: '0.0.0.0:50051',
-      protoPath: 'src/proto/dias.proto',
-      logger: WinstonModule.createLogger({
-        instance: WinstonInstance,
-      }),
+  const logger = WinstonModule.createLogger({
+    instance: WinstonInstance,
+  });
+
+  const app = await NestFactory.create(AssetServerModule, {
+    cors: {
+      origin: process.env.ORIGIN,
+      methods: ['GET', 'POST', 'PATCH', 'DELETE'],
     },
+    logger: WinstonModule.createLogger({
+      instance: WinstonInstance,
+    }),
   });
+
+  app.connectMicroservice({
+    
+  })
 
   app.useGlobalFilters(new HttpExceptionFilter(new Logger()));
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
       forbidNonWhitelisted: true,
-      disableErrorMessages: process.env.NODE_ENV === ('prod' || 'dev'),
+      disableErrorMessages: true,
     }),
   );
 
-  await app.startAllMicroservices();
-
-  await app.listen(Number(process.env.PORT ?? '8000'), () => {
-    const winstonLogger = WinstonModule.createLogger({instance: WinstonInstance})
-    winstonLogger.log(`Asset-Server is running on port ${process.env.PORT ?? 8000}`)
+  await app.listen(Number(process.env.PORT ?? "8081"), () => {
+    logger.log(`ASSET-SERVER HAD STARTED`);
   });
 }
 bootstrap();

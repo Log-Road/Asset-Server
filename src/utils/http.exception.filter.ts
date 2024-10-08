@@ -6,13 +6,11 @@ import {
   Inject,
   InternalServerErrorException,
   Logger,
-} from '@nestjs/common';
+} from "@nestjs/common";
 
 @Catch(HttpException)
 export class HttpExceptionFilter<Error> implements ExceptionFilter {
-  constructor(
-      @Inject(Logger) private readonly logger: Logger
-    ){}
+  constructor(@Inject(Logger) private readonly logger: Logger) {}
 
   catch(exception: Error, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -22,7 +20,11 @@ export class HttpExceptionFilter<Error> implements ExceptionFilter {
     if (!(exception instanceof HttpException))
       exception = new InternalServerErrorException() as any;
 
-    this.logger.warn(`${req.originalUrl} : ${(exception as HttpException).getStatus()} "${(exception as HttpException).message}"`)
+    this.logger.warn(
+      `${req.originalUrl} : ${(exception as HttpException).getStatus()} "${
+        (exception as HttpException).message
+      }"`
+    );
     // <priority>[timestamp] [hostname] [processname] [message]
 
     return res.status((exception as HttpException).getStatus()).json({
